@@ -13,10 +13,6 @@ import uvicorn
 from app.main import create_app
 
 
-def pytest_addoption(parser):
-    parser.addoption("--headed", action="store_true", help="Show the E2E browser window")
-
-
 @pytest.fixture
 def live_server(tmp_path: Path) -> Iterator[str]:
     # Reserve a free port instead of hard-coding 8000 or racing another process.
