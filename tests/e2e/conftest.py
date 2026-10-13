@@ -13,12 +13,35 @@ import uvicorn
 from app.main import create_app
 
 
+# Chromium 拒绝访问的"不安全端口"黑名单（net::ERR_UNSAFE_PORT）。
+# 随机端口可能刚好抽到这里面，所以绑定时要跳过。
+_UNSAFE_PORTS = {
+    1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53,
+    69, 77, 79, 87, 95, 101, 102, 103, 104, 105, 106, 107, 109, 110,
+    111, 113, 115, 117, 119, 123, 135, 137, 139, 143, 161, 179, 389,
+    427, 465, 512, 513, 514, 515, 526, 530, 531, 532, 540, 548, 554,
+    556, 563, 587, 604, 636, 989, 993, 995, 1719, 1720, 1723, 2049,
+    3659, 4045, 5060, 5061, 6000, 6566, 6665, 6666, 6667, 6668, 6669,
+    9100,
+}
+
+
 @pytest.fixture
 def live_server(tmp_path: Path) -> Iterator[str]:
-    # Reserve a free port instead of hard-coding 8000 or racing another process.
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        host, port = sock.getsockname()
+    # Reserve a free port, skipping any port on Chromium's unsafe-port blacklist.
+    sock = None
+    for _ in range(20):
+        candidate = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        candidate.bind(("127.0.0.1", 0))
+        host, port = candidate.getsockname()
+        if port not in _UNSAFE_PORTS:
+            sock = candidate
+            break
+        candidate.close()
+    if sock is None:
+        raise RuntimeError("Could not find a safe local port for the E2E server")
+
+    try:
         config = uvicorn.Config(
             create_app(tmp_path / "browser-cars.db"),
             host=host,
@@ -41,6 +64,8 @@ def live_server(tmp_path: Path) -> Iterator[str]:
             thread.join(timeout=10)
             if thread.is_alive():
                 raise RuntimeError("The E2E server did not stop")
+    finally:
+        sock.close()
 
 
 @pytest.fixture(scope="session")
