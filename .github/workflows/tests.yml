@@ -1,4 +1,4 @@
-name: Cars CRUD Tests
+name: Cars CRUD - Test and Publish
 
 on:
   pull_request:
@@ -60,5 +60,8 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
+          file: ./Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/cars-crud:latest
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/cars-crud:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/cars-crud:sha-${{ github.sha }}
